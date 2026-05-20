@@ -11,22 +11,68 @@ from rtlsdr import RtlSdr
 import numpy as np
 import pyqtgraph as pg
 import sounddevice as sd
+import queue
+import threading
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, 
                              QWidget, QLabel, QPushButton, QSlider, QCheckBox, 
                              QComboBox, QGroupBox, QDoubleSpinBox)
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtCore import QTimer, QThread, Qt
 
 # --- CONSTANTS ---
 FFT_SIZE = 2048
 WATERFALL_HISTORY = 300
 AUDIO_RATE = 48000
-AUDIO_CHUNK = 65536  # IQ samples per frame when FM is active (~32 ms at 2.048 MSPS)
+AUDIO_CHUNK = 32768  # IQ samples per reader tick (~16 ms at 2.048 MSPS)
 
 def get_waterfall_bins(samples):
     """ Calculates PSD in dB from an IQ sample array of length FFT_SIZE. """
-    win = np.blackman(len(samples))
-    fft_shifted = np.fft.fftshift(np.fft.fft(samples * win))
-    return 20 * np.log10(np.maximum(np.abs(fft_shifted), 1e-9))
+    s = samples - samples.mean()          # remove DC spike at centre frequency
+    N = len(s)
+    win = np.blackman(N)
+    fft_shifted = np.fft.fftshift(np.fft.fft(s * win))
+    return 20 * np.log10(np.maximum(np.abs(fft_shifted) / N, 1e-9))
+
+
+class SDRReaderThread(QThread):
+    """Reads IQ blocks from the SDR in the background and drops them into a queue.
+
+    The main thread polls the queue non-blocking, so the GUI never stalls on a
+    USB read. maxsize=1 ensures the display always gets the freshest frame;
+    any unread frame is silently discarded.
+    """
+    def __init__(self, sdr, data_queue):
+        super().__init__()
+        self.sdr = sdr
+        self.q = data_queue
+        self._running = True
+        self._active = threading.Event()
+        self._active.set()
+
+    def pause(self):  self._active.clear()
+    def resume(self): self._active.set()
+
+    def stop(self):
+        self._running = False
+        self._active.set()   # unblock if waiting
+
+    def run(self):
+        while self._running:
+            if not self._active.wait(timeout=0.05):
+                continue
+            try:
+                samples = self.sdr.read_samples(AUDIO_CHUNK)
+            except Exception:
+                break
+            if not self._active.is_set():
+                continue
+            # Evict stale frame so consumer always sees the latest
+            while not self.q.empty():
+                try:
+                    self.q.get_nowait()
+                except queue.Empty:
+                    break
+            self.q.put(samples)
+
 
 class SDRWindow(QMainWindow):
     def __init__(self, sdr_device):
@@ -37,7 +83,8 @@ class SDRWindow(QMainWindow):
         self.audio_stream = None
         self.deemph_state = 0.0
         self.sample_rate = 2.048e6
-        self.setWindowTitle("SDRSharp Style Tuner")
+        self.data_queue = queue.Queue(maxsize=1)
+        self.setWindowTitle("RTL-SDR-NLS")
         self.resize(1100, 800)
         
         self.setStyleSheet("""
@@ -101,18 +148,17 @@ class SDRWindow(QMainWindow):
         self.freq_spin.valueChanged.connect(self.update_sdr_settings)
         radio_layout.addWidget(self.freq_spin)
 
-        step_hlay = QHBoxLayout()
-        self.step_down_btn = QPushButton("◀")
-        self.step_down_btn.setFixedWidth(35)
-        self.step_down_btn.clicked.connect(lambda: self._step_freq(-1))
         self.step_combo = QComboBox()
         self.step_combo.addItems(["1 kHz", "5 kHz", "10 kHz", "25 kHz", "100 kHz", "1 MHz"])
         self.step_combo.setCurrentIndex(2)
-        self.step_up_btn = QPushButton("▶")
-        self.step_up_btn.setFixedWidth(35)
+        radio_layout.addWidget(self.step_combo)
+
+        step_hlay = QHBoxLayout()
+        self.step_down_btn = QPushButton("◀ Step")
+        self.step_down_btn.clicked.connect(lambda: self._step_freq(-1))
+        self.step_up_btn = QPushButton("Step ▶")
         self.step_up_btn.clicked.connect(lambda: self._step_freq(1))
         step_hlay.addWidget(self.step_down_btn)
-        step_hlay.addWidget(self.step_combo)
         step_hlay.addWidget(self.step_up_btn)
         radio_layout.addLayout(step_hlay)
 
@@ -256,14 +302,22 @@ class SDRWindow(QMainWindow):
         self.update_sdr_settings()
         self.update_waterfall_levels()
 
-        # Timer
+        # Background SDR reader — keeps the main thread unblocked
+        self.reader_thread = SDRReaderThread(self.sdr, self.data_queue)
+        self.reader_thread.start()
+
+        # Display timer — polls the queue, never blocks
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_plots)
-        self.timer.start(40) # ~25 fps
+        self.timer.start(15)
 
     def toggle_play(self):
         self.playing = not self.playing
         self.play_btn.setText("Stop" if self.playing else "Play")
+        if self.playing:
+            self.reader_thread.resume()
+        else:
+            self.reader_thread.pause()
 
     def toggle_auto_gain(self, checked):
         self.gain_slider.setEnabled(not checked)
@@ -424,10 +478,9 @@ class SDRWindow(QMainWindow):
         if not self.playing:
             return
 
-        read_size = AUDIO_CHUNK if self.audio_stream is not None else FFT_SIZE
         try:
-            samples = self.sdr.read_samples(read_size)
-        except Exception:
+            samples = self.data_queue.get_nowait()
+        except queue.Empty:
             return
         if len(samples) < FFT_SIZE:
             return
@@ -459,6 +512,8 @@ class SDRWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.timer.stop()
+        self.reader_thread.stop()
+        self.reader_thread.wait(2000)
         if self.audio_stream is not None:
             self.audio_stream.stop()
             self.audio_stream.close()
