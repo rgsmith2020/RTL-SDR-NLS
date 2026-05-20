@@ -1,0 +1,15 @@
+d96097fb3eff34abfa7b8a8e057d8f906612ac3b  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/librtlsdr.dll
+2e1d2403d724e4a9699718fd82a39353c5d35ac8  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/md5sums.txt
+26bc85cf192c9976893b023cdc938016e2bc8498  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_adsb.exe
+7e21a1df072e13ba32959b6ef7df594918d6c6cb  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_biast.exe
+e9f44577a291995b755c171530e81971c8584e5d  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_eeprom.exe
+d9b74e2b11ea8daa007b18d7c4affc9b94328c32  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_fm.exe
+9956053c3935ae736a459a738dbaac1b0852527f  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_ir.exe
+5c9f9204afd494d8e24cec25739b574cb1942580  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_power.exe
+ee6695876b7668fb357d699a2e9217214bebaff0  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_raw2wav.exe
+6f34237baaaefa123af51eb6f30f1a6fd7950360  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_sdr.exe
+35f6b15db7da1b3254025fd112c68e774ac03d1c  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_tcp.exe
+3d704ed7e42b0fe0a87e4b9c49ec664ee3fcc1ea  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_test.exe
+b71ce91eee85816621b02c3ad6724e4410775e4b  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_udp.exe
+b28bbebfef051db57bbbe84bb0fc6804f91cfb2e  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_wavestat.exe
+2ed5b82c509e3833ccc43885402d274e6832cca3  /home/runner/work/librtlsdr/librtlsdr/rtlsdr-bin-w64_dlldep/bin/rtl_wavestream.exe
